@@ -247,8 +247,6 @@ bool initialize()
     std::string fs_location("../src/fragment_shader.txt");
     sloader.loadFromFile(vs_location, vs);
     sloader.loadFromFile(fs_location, fs);
-    std::cout << "VS:" << std::endl << vs << std::endl;
-    std::cout << "FS:" << std::endl << fs << std::endl;
 
     //compile the shaders
     GLint shader_status;
