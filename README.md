@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 A simple example of matrix use in OpenGL
 ========================================
 
@@ -25,3 +26,7 @@ Additional Notes For OSX Users
 ------------------------------
 
 Ensure that the latest version of the Developer Tools is installed.
+=======
+# cs480Salivar
+CS 480 Projects
+>>>>>>> 7e82d08106ba4fcf54478c77bc0b89d9b02dc722
