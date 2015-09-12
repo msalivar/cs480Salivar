@@ -2,6 +2,7 @@
 
 #include <GL/glew.h> // glew must be included before the main gl libs
 #include <GL/glut.h> // doing otherwise causes compiler shouting
+#include <GL/freeglut.h>
 #include <iostream>
 #include <chrono>
 #include <string>
@@ -44,6 +45,8 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 
 //shader loader object
 Shader sloader;
+
+void renderBitmapString(double x, double y, std::string text);
 
 //--GLUT Callbacks
 void render();
@@ -156,6 +159,16 @@ void render()
     glVertexAttribPointer( loc_color, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex,color));
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
+
+    // Draw text
+    mvp = projection * view * glm::mat4(1.0f);
+    glUniformMatrix4fv(loc_mvpmat, 1, GL_FALSE, glm::value_ptr(mvp));
+    glEnableVertexAttribArray(loc_position);
+    glEnableVertexAttribArray(loc_color);
+
+    renderBitmapString(100.0, 0, "example texterino");
+    renderBitmapString(150.0, 0, "second example");
+
     //clean up
     glDisableVertexAttribArray(loc_position);
     glDisableVertexAttribArray(loc_color);
@@ -168,8 +181,8 @@ void update()
 {
     //total time
     static float angle = 0.0;
-    float dt = getDT();// if you have anything moving, use dt.
-    float axis = 2.0f;
+    float dt = getDT(); // if you have anything moving, use dt.
+    float scalar = 2.0f;
     angle += dt * M_PI/2; //move through 90 degrees a second
     model = glm::translate( glm::mat4(1.0f), glm::vec3(4.0 * sin(angle), 0.0, 4.0 * cos(angle)));
     glm::mat4 model_pos = model;
@@ -177,9 +190,9 @@ void update()
     {
         if (swap)
         {
-            axis *= -1;
+            scalar *= -1;
         }
-        model = glm::rotate(model, axis * angle, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, scalar * angle, glm::vec3(0.0f, 1.0f, 0.0f));
     }
     moon = glm::translate( model_pos, glm::vec3(4.0 * sin(angle * 1.15), 0.0, 4.0 * cos(angle * 1.15)));
     moon = glm::rotate(moon, 0.5f * angle, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -195,10 +208,10 @@ void reshape(int n_w, int n_h)
     h = n_h;
     //Change the viewport to be correct
     glViewport( 0, 0, w, h);
+    glOrtho(0, w, 0, h, -1, 1);
     //Update the projection matrix as well
     //See the init function for an explaination
     projection = glm::perspective(45.0f, float(w)/float(h), 0.01f, 100.0f);
-
 }
 
 void keyboard(unsigned char key, int x_pos, int y_pos)
@@ -292,8 +305,8 @@ bool initialize()
                         };
 
     Vertex moon_geometry[] =  { {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, 0.65}, {1.0, 1.0, 1.65}},
-                                {{-0.65, 0.65, 0.65}, {1.0, 1.65, 1.65}},
+                                {{-0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
+                                {{-0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
 
                                 {{0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
                                 {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
@@ -485,3 +498,10 @@ void contextMenu(int id)
     }
     glutPostRedisplay();
 }
+
+void renderBitmapString(double x, double y, std::string text)
+{
+    char* temp = { "example text" };
+    glRasterPos2d(x, y);
+    glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)temp);
+} 
