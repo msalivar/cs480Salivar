@@ -1,4 +1,4 @@
-Adding Menus and Mouse Interactions in OpenGL
+PA3: Adding an Orbiting Moon and More Interaction
 ========================================
 
 New Features:
