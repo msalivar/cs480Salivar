@@ -1,3 +1,4 @@
+
 #define GLM_FORCE_RADIANS
 
 #include <GL/glew.h> // glew must be included before the main gl libs
@@ -46,7 +47,7 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 //shader loader object
 Shader sloader;
 
-void renderBitmapString(double x, double y, std::string text);
+void renderBitmapString(int x, int y, std::string text);
 
 //--GLUT Callbacks
 void render();
@@ -159,15 +160,13 @@ void render()
     glVertexAttribPointer( loc_color, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex,color));
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
-
     // Draw text
+    glDisable(GL_LIGHTING);
     mvp = projection * view * glm::mat4(1.0f);
     glUniformMatrix4fv(loc_mvpmat, 1, GL_FALSE, glm::value_ptr(mvp));
-    glEnableVertexAttribArray(loc_position);
-    glEnableVertexAttribArray(loc_color);
-
-    renderBitmapString(100.0, 0, "example texterino");
-    renderBitmapString(150.0, 0, "second example");
+	glWindowPos2i(10, 10);
+	glColor3f(0.5, 0.5f, 0.5f);
+    renderBitmapString(0, 0, "example texterino");
 
     //clean up
     glDisableVertexAttribArray(loc_position);
@@ -208,7 +207,6 @@ void reshape(int n_w, int n_h)
     h = n_h;
     //Change the viewport to be correct
     glViewport( 0, 0, w, h);
-    glOrtho(0, w, 0, h, -1, 1);
     //Update the projection matrix as well
     //See the init function for an explaination
     projection = glm::perspective(45.0f, float(w)/float(h), 0.01f, 100.0f);
@@ -499,9 +497,8 @@ void contextMenu(int id)
     glutPostRedisplay();
 }
 
-void renderBitmapString(double x, double y, std::string text)
+void renderBitmapString(int x, int y, std::string text)
 {
     char* temp = { "example text" };
-    glRasterPos2d(x, y);
-    glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)temp);
+    glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)temp);
 } 
