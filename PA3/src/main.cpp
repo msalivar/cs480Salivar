@@ -26,6 +26,7 @@ struct Vertex
 bool swap = true;
 bool pause = false;
 int w = 640, h = 480;// Window size
+static float rotation = 0.0;
 GLuint program;// The GLSL program handle
 GLuint vbo_geometry;// VBO handle for our cube
 GLuint vbo_moon;//VBO handle for moon
@@ -47,13 +48,14 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 //shader loader object
 Shader sloader;
 
-void renderBitmapString(int x, int y, std::string text);
+void renderBitmapString(int x, int y, const char* text);
 
 //--GLUT Callbacks
 void render();
 void update();
 void reshape(int n_w, int n_h);
 void keyboard(unsigned char key, int x_pos, int y_pos);
+void special_keyboard(int key, int x_pos, int y_pos);
 void mouse(int button, int state, int x, int y);
 void contextMenu(int id);
 
@@ -90,6 +92,7 @@ int main(int argc, char **argv)
     glutReshapeFunc(reshape);// Called if the window is resized
     glutIdleFunc(update);// Called if there is nothing else to do
     glutKeyboardFunc(keyboard);// Called if there is keyboard input
+    glutSpecialFunc(special_keyboard); // Special key input
     glutMouseFunc(mouse);// Called if there is mouse input
 
     // Menu Setup
@@ -165,9 +168,15 @@ void render()
     mvp = projection * view * glm::mat4(1.0f);
     glUniformMatrix4fv(loc_mvpmat, 1, GL_FALSE, glm::value_ptr(mvp));
 	glWindowPos2i(10, 10);
-	glColor3f(0.5, 0.5f, 0.5f);
-    renderBitmapString(0, 0, "example texterino");
-
+	glColor3f(1.0f, 1.0f, 1.0f);
+    if (swap)
+    { 
+        renderBitmapString(0, 0, "Clockwise Rotation");
+    }
+    else
+    {
+        renderBitmapString(0, 0, "Counter-Clockwise Rotation");   
+    }
     //clean up
     glDisableVertexAttribArray(loc_position);
     glDisableVertexAttribArray(loc_color);
@@ -181,7 +190,6 @@ void update()
     //total time
     static float angle = 0.0;
     float dt = getDT(); // if you have anything moving, use dt.
-    float scalar = 2.0f;
     angle += dt * M_PI/2; //move through 90 degrees a second
     model = glm::translate( glm::mat4(1.0f), glm::vec3(4.0 * sin(angle), 0.0, 4.0 * cos(angle)));
     glm::mat4 model_pos = model;
@@ -189,12 +197,16 @@ void update()
     {
         if (swap)
         {
-            scalar *= -1;
+            rotation -= 0.035f;
         }
-        model = glm::rotate(model, scalar * angle, glm::vec3(0.0f, 1.0f, 0.0f));
+        else
+        {
+            rotation += 0.035f;
+        }
+        model = glm::rotate(model, rotation, glm::vec3(0.0f, 1.0f, 0.0f));
     }
-    moon = glm::translate( model_pos, glm::vec3(4.0 * sin(angle * 1.15), 0.0, 4.0 * cos(angle * 1.15)));
-    moon = glm::rotate(moon, 0.5f * angle, glm::vec3(0.0f, 1.0f, 0.0f));
+    moon = glm::translate( model_pos, glm::vec3(4.0 * sin(angle * 1.65), 0.0, 4.0 * cos(angle * 1.65)));
+    moon = glm::rotate(moon, 1.15f * angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
     // Update the state of the scene
     glutPostRedisplay();//call the display callback
@@ -215,20 +227,34 @@ void reshape(int n_w, int n_h)
 void keyboard(unsigned char key, int x_pos, int y_pos)
 {
     // Handle keyboard input
-    if (key == 32)
+    switch(key)
     {
-        if (swap)
-        {
-            swap = false;
-        }
-        else
-        {
-            swap = true;
-        }
+        case 32:
+            if (swap)
+            {
+                swap = false;
+            }
+            else
+            {
+                swap = true;
+            }
+            break;
+        case 27:
+            exit(0);
+            break;
     }
-    if(key == 27)//ESC
+}
+
+void special_keyboard(int key, int x_pos, int y_pos)
+{
+    switch(key)
     {
-        exit(0);
+        case GLUT_KEY_LEFT:
+            swap = false;
+            break;
+        case GLUT_KEY_RIGHT:
+            swap = true;
+            break;
     }
 }
 
@@ -497,8 +523,8 @@ void contextMenu(int id)
     glutPostRedisplay();
 }
 
-void renderBitmapString(int x, int y, std::string text)
+void renderBitmapString(int x, int y, const char* text)
 {
-    char* temp = { "example text" };
-    glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)temp);
+    //char* temp = text;
+    glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)text);
 } 
