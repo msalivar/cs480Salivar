@@ -197,11 +197,13 @@ void update()
     {
         if (swap)
         {
-            rotation -= 0.035f;
+            rotation -= dt * M_PI * 2;
+            if (rotation < 0) { rotation = 359; }
         }
         else
         {
-            rotation += 0.035f;
+            rotation += dt * M_PI * 2;
+            if (rotation > 360) { rotation = 0; }
         }
         model = glm::rotate(model, rotation, glm::vec3(0.0f, 1.0f, 0.0f));
     }
@@ -240,7 +242,7 @@ void keyboard(unsigned char key, int x_pos, int y_pos)
             }
             break;
         case 27:
-            exit(0);
+            glutLeaveMainLoop();
             break;
     }
 }
@@ -507,7 +509,7 @@ void contextMenu(int id)
     switch(id)
     {
         case 1:
-            exit(0);
+            glutLeaveMainLoop();
             break;
         case 2:
             if (pause)
