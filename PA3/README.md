@@ -8,7 +8,9 @@ Smaller cube orbits the larger cube. It can't be controlled.
 
 Colorful cube's rotation can also be controlled with the left/right arrow keys.
 
-Text in lower left corner indicates direction of spin on the colorful cube.
+Extra Credit: Text in lower left corner indicates direction of spin on the colorful cube.
+
+Potential problem - Couldn't successfully set color of rendered text. May be difficult to read.
 
 
 As of PA2:
