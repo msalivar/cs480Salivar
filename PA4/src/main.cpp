@@ -14,6 +14,8 @@
 #include <iostream>
 #include <fstream>
 
+using namespace std;
+
 //--Data types
 //This object will define the attributes of a vertex(position, color, etc...)
 struct Vertex
@@ -24,13 +26,11 @@ struct Vertex
 
 //--Evil Global variables
 //Just for this example!
-bool swap = true;
+bool reverse_rot = true;
 bool pause = false;
 int w = 640, h = 480;// Window size
-static float rotation = 0.0;
 GLuint program;// The GLSL program handle
 GLuint vbo_geometry;// VBO handle for our cube
-GLuint vbo_moon;//VBO handle for moon
 
 //uniform locations
 GLint loc_mvpmat;// Location of the modelviewprojection matrix in the shader
@@ -41,7 +41,6 @@ GLint loc_color;
 
 //transform matrices
 glm::mat4 model;//obj->world each object should have its own model matrix
-glm::mat4 moon;//moon object matrix
 glm::mat4 view;//world->eye
 glm::mat4 projection;//eye->clip
 glm::mat4 mvp;//premultiplied modelviewprojection
@@ -50,7 +49,8 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 Shader sloader;
 
 void renderBitmapString(int x, int y, const char* text);
-bool loadOBJ(char* objFile);
+int countVertices(const char* objFile);
+Vertex* loadOBJ(int numVertices, const char* objFile);
 
 //--GLUT Callbacks
 void render();
@@ -100,7 +100,6 @@ int main(int argc, char **argv)
     // Menu Setup
     glutCreateMenu(contextMenu);
     glutAddMenuEntry("Quit", 1);
-    glutAddMenuEntry("Toggle Rotation", 2);
     glutAttachMenu(GLUT_RIGHT_BUTTON);
 
     // Initialize all of our resources(shaders, geometry)
@@ -153,32 +152,8 @@ void render()
                            sizeof(Vertex),
                            (void*)offsetof(Vertex,color));
 
-    glDrawArrays(GL_TRIANGLES, 0, 36);//mode, starting index, count
+    glDrawArrays(GL_TRIANGLES , 0, 36);//mode, starting index, count
 
-    // Draw moon
-    mvp = projection * view * moon;
-    glUniformMatrix4fv(loc_mvpmat, 1, GL_FALSE, glm::value_ptr(mvp));
-    glEnableVertexAttribArray(loc_position);
-    glEnableVertexAttribArray(loc_color);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_moon);
-    glVertexAttribPointer( loc_position, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer( loc_color, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex,color));
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-
-    // Draw text
-    glDisable(GL_LIGHTING);
-    mvp = projection * view * glm::mat4(1.0f);
-    glUniformMatrix4fv(loc_mvpmat, 1, GL_FALSE, glm::value_ptr(mvp));
-	glWindowPos2i(10, 10);
-	glColor3f(1.0f, 1.0f, 1.0f);
-    if (swap)
-    { 
-        renderBitmapString(0, 0, "Clockwise Rotation");
-    }
-    else
-    {
-        renderBitmapString(0, 0, "Counter-Clockwise Rotation");   
-    }
     //clean up
     glDisableVertexAttribArray(loc_position);
     glDisableVertexAttribArray(loc_color);
@@ -194,23 +169,6 @@ void update()
     float dt = getDT(); // if you have anything moving, use dt.
     angle += dt * M_PI/2; //move through 90 degrees a second
     model = glm::translate( glm::mat4(1.0f), glm::vec3(4.0 * sin(angle), 0.0, 4.0 * cos(angle)));
-    glm::mat4 model_pos = model;
-    if (!pause)
-    {
-        if (swap)
-        {
-            rotation -= dt * M_PI * 2;
-            if (rotation < 0) { rotation = 359; }
-        }
-        else
-        {
-            rotation += dt * M_PI * 2;
-            if (rotation > 360) { rotation = 0; }
-        }
-        model = glm::rotate(model, rotation, glm::vec3(0.0f, 1.0f, 0.0f));
-    }
-    moon = glm::translate( model_pos, glm::vec3(4.0 * sin(angle * 1.65), 0.0, 4.0 * cos(angle * 1.65)));
-    moon = glm::rotate(moon, 1.15f * angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
     // Update the state of the scene
     glutPostRedisplay();//call the display callback
@@ -234,13 +192,13 @@ void keyboard(unsigned char key, int x_pos, int y_pos)
     switch(key)
     {
         case 32:
-            if (swap)
+            if (reverse_rot)
             {
-                swap = false;
+                reverse_rot = false;
             }
             else
             {
-                swap = true;
+                reverse_rot = true;
             }
             break;
         case 27:
@@ -254,10 +212,10 @@ void special_keyboard(int key, int x_pos, int y_pos)
     switch(key)
     {
         case GLUT_KEY_LEFT:
-            swap = false;
+            reverse_rot = false;
             break;
         case GLUT_KEY_RIGHT:
-            swap = true;
+            reverse_rot = true;
             break;
     }
 }
@@ -266,129 +224,27 @@ void mouse(int button, int state, int x, int y)
 {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
     {
-        if (swap)
+        if (reverse_rot)
         {
-            swap = false;
+            reverse_rot = false;
         }
         else
         {
-            swap = true;
+            reverse_rot = true;
         }
     }
 }
 
 bool initialize()
 {
-    // Initialize basic geometry and shaders for this example
-
-    //this defines a cube, this is why a model loader is nice
-    //you can also do this with a draw elements and indices, try to get that working
-    Vertex geometry[] = { {{-1.0, -1.0, -1.0}, {0.0, 0.0, 0.0}},
-                          {{-1.0, -1.0, 1.0}, {0.0, 0.0, 1.0}},
-                          {{-1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-
-                          {{1.0, 1.0, -1.0}, {1.0, 1.0, 0.0}},
-                          {{-1.0, -1.0, -1.0}, {0.0, 0.0, 0.0}},
-                          {{-1.0, 1.0, -1.0}, {0.0, 1.0, 0.0}},
-                          
-                          {{1.0, -1.0, 1.0}, {1.0, 0.0, 1.0}},
-                          {{-1.0, -1.0, -1.0}, {0.0, 0.0, 0.0}},
-                          {{1.0, -1.0, -1.0}, {1.0, 0.0, 0.0}},
-                          
-                          {{1.0, 1.0, -1.0}, {1.0, 1.0, 0.0}},
-                          {{1.0, -1.0, -1.0}, {1.0, 0.0, 0.0}},
-                          {{-1.0, -1.0, -1.0}, {0.0, 0.0, 0.0}},
-
-                          {{-1.0, -1.0, -1.0}, {0.0, 0.0, 0.0}},
-                          {{-1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-                          {{-1.0, 1.0, -1.0}, {0.0, 1.0, 0.0}},
-
-                          {{1.0, -1.0, 1.0}, {1.0, 0.0, 1.0}},
-                          {{-1.0, -1.0, 1.0}, {0.0, 0.0, 1.0}},
-                          {{-1.0, -1.0, -1.0}, {0.0, 0.0, 0.0}},
-
-                          {{-1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-                          {{-1.0, -1.0, 1.0}, {0.0, 0.0, 1.0}},
-                          {{1.0, -1.0, 1.0}, {1.0, 0.0, 1.0}},
-                          
-                          {{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
-                          {{1.0, -1.0, -1.0}, {1.0, 0.0, 0.0}},
-                          {{1.0, 1.0, -1.0}, {1.0, 1.0, 0.0}},
-
-                          {{1.0, -1.0, -1.0}, {1.0, 0.0, 0.0}},
-                          {{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
-                          {{1.0, -1.0, 1.0}, {1.0, 0.0, 1.0}},
-
-                          {{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
-                          {{1.0, 1.0, -1.0}, {1.0, 1.0, 0.0}},
-                          {{-1.0, 1.0, -1.0}, {0.0, 1.0, 0.0}},
-
-                          {{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
-                          {{-1.0, 1.0, -1.0}, {0.0, 1.0, 0.0}},
-                          {{-1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-
-                          {{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}},
-                          {{-1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-                          {{1.0, -1.0, 1.0}, {1.0, 0.0, 1.0}}
-                        };
-
-    Vertex moon_geometry[] =  { {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-
-                                {{0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                
-                                {{0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                
-                                {{0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-
-                                {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-
-                                {{0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-
-                                {{-0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                
-                                {{0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-
-                                {{0.65, -0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}},
-
-                                {{0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-
-                                {{0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, -0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-
-                                {{0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{-0.65, 0.65, 0.65}, {1.0, 1.0, 1.0}},
-                                {{0.65, -0.65, 0.65}, {1.0, 1.0, 1.0}}
-                            };
+    Vertex* geometry = 0;
+    int num = countVertices("cube.obj");
+    geometry = loadOBJ(num, "cube.obj");
 
     // Create a Vertex Buffer object to store this vertex info on the GPU
     glGenBuffers(1, &vbo_geometry);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_geometry);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(geometry), geometry, GL_STATIC_DRAW);
-
-    glGenBuffers(1, &vbo_moon);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_moon);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(moon_geometry), moon_geometry, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num, geometry, GL_STATIC_DRAW);
 
     //--Geometry done
 
@@ -401,9 +257,6 @@ bool initialize()
     std::string fs_location("fragment_shader.txt");
     sloader.loadFromFile(vs_location, vs);
     sloader.loadFromFile(fs_location, fs);
-
-    char* path = { "cube.obj" };
-    std::cout << loadOBJ(path) << std::endl;
 
     //compile the shaders
     GLint shader_status;
@@ -496,7 +349,6 @@ void cleanUp()
     // Clean up, Clean up
     glDeleteProgram(program);
     glDeleteBuffers(1, &vbo_geometry);
-    glDeleteBuffers(1, &vbo_moon);
 }
 
 //returns the time delta
@@ -516,16 +368,6 @@ void contextMenu(int id)
         case 1:
             glutLeaveMainLoop();
             break;
-        case 2:
-            if (pause)
-            {
-                pause = false;
-            }
-            else
-            {
-                pause = true;
-            }
-            break;
     }
     glutPostRedisplay();
 }
@@ -536,39 +378,53 @@ void renderBitmapString(int x, int y, const char* text)
     glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)text);
 }
 
-bool loadOBJ(char* objFile)
+int countVertices(const char* objFile)
 {
-    std::ifstream fin;
+
+    ifstream fin;
     fin.open(objFile);
     int count = 0;
     if (fin.is_open())
     {
         while (fin.eof() == false)
         {
-            char buffer[40];
-            fin.getline(buffer, 40);
+            char buffer[80];
+            fin.getline(buffer, 80);
             if (buffer[0] == 'v' && buffer[1] == ' ')
             {
                 count++;
             }
         }
-        Vertex* geometry = new Vertex[count];
-        fin.seekg(0, fin.end); 
+        return count;
+    }
+    return -1;
+}
+
+Vertex* loadOBJ(int numVertices, const char* objFile)
+{
+    Vertex* geometry = new Vertex[numVertices];
+    ifstream fin;
+    fin.open(objFile);
+    int numAdded = 0;
+    if (fin.is_open())
+    {
         while (fin.eof() == false)
         {
-            char buffer[40];
-            fin.getline(buffer, 40);
-            if (buffer[0] == 'v' && buffer[1] == ' ')
+            string input = "";
+            fin >> input;
+            if (input == "v")
             {
-                
+                float x;
+                fin >> x;
+                float y;
+                fin >> y;
+                float z;
+                fin >> z;
+                Vertex temp = {{x, y, z}, {1.0, 1.0, 1.0}};
+                geometry[numAdded] = temp;
+                numAdded++;
             }
         }
-
-
-
-
-
-        return true;
     }
-    return false;
+    return geometry;
 }
