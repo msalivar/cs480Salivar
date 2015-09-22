@@ -7,6 +7,7 @@
 #include <iostream>
 #include <chrono>
 #include <cctype>
+#include <vector>
 #include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -27,6 +28,7 @@ struct Vertex
 
 //--Evil Global variables
 //Just for this example!
+string objPath = "";
 int numFaces = 0;
 int w = 640, h = 480;// Window size
 GLuint program;// The GLSL program handle
@@ -48,18 +50,17 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 //shader loader object
 Shader sloader;
 
-void renderBitmapString(int x, int y, const char* text);
+// Model Loader Functions
 int countLines(const char* objFile, const char header);
 Vertex* loadVertices(int numVertices, const char* objFile);
 int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, const char* objFile);
+Vertex loadMaterial(const string mat_name, const char* objFile);
 
 //--GLUT Callbacks
 void render();
 void update();
 void reshape(int n_w, int n_h);
 void keyboard(unsigned char key, int x_pos, int y_pos);
-void special_keyboard(int key, int x_pos, int y_pos);
-void mouse(int button, int state, int x, int y);
 void contextMenu(int id);
 
 //--Resource management
@@ -73,6 +74,22 @@ std::chrono::time_point<std::chrono::high_resolution_clock> t1,t2;
 //--Main
 int main(int argc, char **argv)
 {
+    if (argc != 2)
+    {
+        cout << "Usage: " << argv[0] << " <.obj file name>" << endl;
+        return 0;
+    }
+    else
+    {
+        objPath = argv[1];
+        ifstream fin(objPath);
+        if (!fin.is_open())
+        {
+            cout << "Could not find .obj file." << endl;
+            return 0;
+        }
+    }
+
     // Initialize glut
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);
@@ -95,8 +112,6 @@ int main(int argc, char **argv)
     glutReshapeFunc(reshape);// Called if the window is resized
     glutIdleFunc(update);// Called if there is nothing else to do
     glutKeyboardFunc(keyboard);// Called if there is keyboard input
-    glutSpecialFunc(special_keyboard); // Special key input
-    glutMouseFunc(mouse);// Called if there is mouse input
 
     // Menu Setup
     glutCreateMenu(contextMenu);
@@ -169,7 +184,7 @@ void update()
     static float angle = 0.0;
     float dt = getDT(); // if you have anything moving, use dt.
     angle += dt * M_PI/2; //move through 90 degrees a second
-    model = glm::translate( glm::mat4(1.0f), glm::vec3(4.0 * sin(angle), 0.0, 4.0 * cos(angle)));
+    model = glm::translate( glm::mat4(1.0f), glm::vec3(4.0 * sin(angle), 0.0, 0));
 
     // Update the state of the scene
     glutPostRedisplay();//call the display callback
@@ -196,16 +211,6 @@ void keyboard(unsigned char key, int x_pos, int y_pos)
             glutLeaveMainLoop();
             break;
     }
-}
-
-void special_keyboard(int key, int x_pos, int y_pos)
-{
-
-}
-
-void mouse(int button, int state, int x, int y)
-{
-
 }
 
 bool initialize()
@@ -303,7 +308,7 @@ bool initialize()
     //  if you will be having a moving camera the view matrix will need to more dynamic
     //  ...Like you should update it before you render more dynamic 
     //  for this project having them static will be fine
-    view = glm::lookAt( glm::vec3(0.0, 8.0, -16.0), //Eye Position
+    view = glm::lookAt( glm::vec3(0.0, 6.0, -15.0), //Eye Position
                         glm::vec3(0.0, 0.0, 0.0), //Focus point
                         glm::vec3(0.0, 1.0, 0.0)); //Positive Y is up
 
@@ -350,12 +355,6 @@ void contextMenu(int id)
             break;
     }
     glutPostRedisplay();
-}
-
-void renderBitmapString(int x, int y, const char* text)
-{
-    //char* temp = text;
-    glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)text);
 }
 
 int countLines(const char* objFile, const char header)
@@ -414,6 +413,7 @@ Vertex* loadVertices(int numVertices, const char* objFile)
 int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, const char* objFile)
 {
     geometry = new Vertex[numFaces * 3];
+    float currentColor[3] = {1, 1, 1};
     ifstream fin;
     fin.open(objFile);
     int numAdded = 0;
@@ -423,7 +423,15 @@ int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numF
         {
             string input = "";
             fin >> input;
-            if (input == "f")
+            if (input == "usemtl")
+            {
+                fin >> input;
+                Vertex temp = loadMaterial(input, "cube.obj");
+                currentColor[0] = temp.color[0];
+                currentColor[1] = temp.color[1];
+                currentColor[2] = temp.color[2];
+            }
+            else if (input == "f")
             {
                 for (int count = 0; count < 3; count++)
                 {
@@ -438,7 +446,7 @@ int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numF
                     float x = vertices[index - 1].position[0];
                     float y = vertices[index - 1].position[1];
                     float z = vertices[index - 1].position[2];
-                    Vertex temp = {{x, y, z}, {1.0, 1.0, 1.0}};
+                    Vertex temp = {{x, y, z}, {currentColor[0], currentColor[1], currentColor[2]}};
                     geometry[numAdded] = temp;
                     numAdded++;
                 }
@@ -447,4 +455,49 @@ int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numF
     }
     fin.close();
     return numAdded;
+}
+
+Vertex loadMaterial(const string mat_name, const char* objFile)
+{
+    Vertex temp = {{0, 0, 0}, {1, 1, 1}};
+    string path = "";
+    ifstream reader;
+    reader.open(objFile);
+    if (reader.is_open())
+    {
+        while (reader.eof() == false)
+        {
+            string input = "";
+            reader >> input;
+            if (input == "mtllib")
+            {
+                reader >> path;
+                break;
+            }
+        }
+        reader.close();
+    }
+    reader.open(path);
+    if(reader.is_open())
+    {
+        while (reader.eof() == false)
+        {
+            string input = "";
+            reader >> input;
+            if (input == mat_name)
+            {
+                while (input != "Kd")
+                {
+                    reader >> input;
+                }
+                float r, g, b;
+                reader >> r;
+                reader >> g;
+                reader >> b;
+                temp = {{0, 0, 0}, {r, g, b}};
+            }
+        }
+        reader.close();
+    }
+    return temp;
 }
