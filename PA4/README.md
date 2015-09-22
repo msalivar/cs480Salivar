@@ -1,21 +1,11 @@
-PA3: Adding an Orbiting Moon and More Interaction
+PA4: Model Loading
 ========================================
 
 New Features:
 ---------------------
 
-Smaller cube orbits the larger cube. It can't be controlled.
+Loads .obj file specified with command line argument. Either write entire path or just the file name if placed in PA4/bin/ directory.
 
-Colorful cube's rotation can also be controlled with the left/right arrow keys.
+Extra Credit: Loads materials set in .mat file. Only works if .mat file is in same directory as .obj file, or if entire path is written in the .obj file. If material loading fails, default color is white.
 
-Text in lower left corner indicates direction of spin on the colorful cube.
-
-
-As of PA2:
----------------------
-
-Press space to reverse spin direction.
-
-Left click screen to reverse spin direction.
-
-Right click to open context menu: quit or toggle spin.
+Unnecessary functionality from previous projects removed. Loaded model now moves left to right.
