@@ -6,6 +6,7 @@
 #include <GL/freeglut.h>
 #include <iostream>
 #include <chrono>
+#include <cctype>
 #include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -26,8 +27,7 @@ struct Vertex
 
 //--Evil Global variables
 //Just for this example!
-bool reverse_rot = true;
-bool pause = false;
+int numFaces = 0;
 int w = 640, h = 480;// Window size
 GLuint program;// The GLSL program handle
 GLuint vbo_geometry;// VBO handle for our cube
@@ -49,8 +49,9 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 Shader sloader;
 
 void renderBitmapString(int x, int y, const char* text);
-int countVertices(const char* objFile);
-Vertex* loadOBJ(int numVertices, const char* objFile);
+int countLines(const char* objFile, const char header);
+Vertex* loadVertices(int numVertices, const char* objFile);
+int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, const char* objFile);
 
 //--GLUT Callbacks
 void render();
@@ -152,7 +153,7 @@ void render()
                            sizeof(Vertex),
                            (void*)offsetof(Vertex,color));
 
-    glDrawArrays(GL_TRIANGLES , 0, 36);//mode, starting index, count
+    glDrawArrays(GL_TRIANGLES , 0, numFaces * 3);//mode, starting index, count
 
     //clean up
     glDisableVertexAttribArray(loc_position);
@@ -191,16 +192,6 @@ void keyboard(unsigned char key, int x_pos, int y_pos)
     // Handle keyboard input
     switch(key)
     {
-        case 32:
-            if (reverse_rot)
-            {
-                reverse_rot = false;
-            }
-            else
-            {
-                reverse_rot = true;
-            }
-            break;
         case 27:
             glutLeaveMainLoop();
             break;
@@ -209,42 +200,27 @@ void keyboard(unsigned char key, int x_pos, int y_pos)
 
 void special_keyboard(int key, int x_pos, int y_pos)
 {
-    switch(key)
-    {
-        case GLUT_KEY_LEFT:
-            reverse_rot = false;
-            break;
-        case GLUT_KEY_RIGHT:
-            reverse_rot = true;
-            break;
-    }
+
 }
 
 void mouse(int button, int state, int x, int y)
 {
-    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
-    {
-        if (reverse_rot)
-        {
-            reverse_rot = false;
-        }
-        else
-        {
-            reverse_rot = true;
-        }
-    }
+
 }
 
 bool initialize()
 {
+    Vertex* vertexIndices = 0;
+    int numVertices = countLines("cube.obj", 'v');
+    numFaces = countLines("cube.obj", 'f');
+    vertexIndices = loadVertices(numVertices, "cube.obj");
     Vertex* geometry = 0;
-    int num = countVertices("cube.obj");
-    geometry = loadOBJ(num, "cube.obj");
+    loadTriangles(vertexIndices, geometry, numVertices, numFaces, "cube.obj");
 
     // Create a Vertex Buffer object to store this vertex info on the GPU
     glGenBuffers(1, &vbo_geometry);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_geometry);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num, geometry, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * (numFaces * 3), geometry, GL_STATIC_DRAW);
 
     //--Geometry done
 
@@ -341,6 +317,10 @@ bool initialize()
     glDepthFunc(GL_LESS);
 
     //and its done
+    delete [] vertexIndices;
+    vertexIndices = 0;
+    delete [] geometry;
+    geometry = 0;
     return true;
 }
 
@@ -378,9 +358,8 @@ void renderBitmapString(int x, int y, const char* text)
     glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)text);
 }
 
-int countVertices(const char* objFile)
+int countLines(const char* objFile, const char header)
 {
-
     ifstream fin;
     fin.open(objFile);
     int count = 0;
@@ -390,19 +369,21 @@ int countVertices(const char* objFile)
         {
             char buffer[80];
             fin.getline(buffer, 80);
-            if (buffer[0] == 'v' && buffer[1] == ' ')
+            if (buffer[0] == header && buffer[1] == ' ')
             {
                 count++;
             }
         }
+        fin.close();
         return count;
     }
+    fin.close();
     return -1;
 }
 
-Vertex* loadOBJ(int numVertices, const char* objFile)
+Vertex* loadVertices(int numVertices, const char* objFile)
 {
-    Vertex* geometry = new Vertex[numVertices];
+    Vertex* vertexIndices = new Vertex[numVertices];
     ifstream fin;
     fin.open(objFile);
     int numAdded = 0;
@@ -421,10 +402,49 @@ Vertex* loadOBJ(int numVertices, const char* objFile)
                 float z;
                 fin >> z;
                 Vertex temp = {{x, y, z}, {1.0, 1.0, 1.0}};
-                geometry[numAdded] = temp;
+                vertexIndices[numAdded] = temp;
                 numAdded++;
             }
         }
     }
-    return geometry;
+    fin.close();
+    return vertexIndices;
+}
+
+int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, const char* objFile)
+{
+    geometry = new Vertex[numFaces * 3];
+    ifstream fin;
+    fin.open(objFile);
+    int numAdded = 0;
+    if (fin.is_open())
+    {
+        while (numAdded < (numFaces * 3) && fin.eof() == false)
+        {
+            string input = "";
+            fin >> input;
+            if (input == "f")
+            {
+                for (int count = 0; count < 3; count++)
+                {
+                    string vertex;
+                    fin >> vertex;
+                    int index = vertex[0] - '0';
+                    if (isdigit(vertex[1]))
+                    {
+                        index *= 10;
+                        index += vertex[1] - '0';
+                    }
+                    float x = vertices[index - 1].position[0];
+                    float y = vertices[index - 1].position[1];
+                    float z = vertices[index - 1].position[2];
+                    Vertex temp = {{x, y, z}, {1.0, 1.0, 1.0}};
+                    geometry[numAdded] = temp;
+                    numAdded++;
+                }
+            }
+        }
+    }
+    fin.close();
+    return numAdded;
 }
