@@ -51,10 +51,10 @@ glm::mat4 mvp;//premultiplied modelviewprojection
 Shader sloader;
 
 // Model Loader Functions
-int countLines(const char* objFile, const char header);
-Vertex* loadVertices(int numVertices, const char* objFile);
-int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, const char* objFile);
-Vertex loadMaterial(const string mat_name, const char* objFile);
+int countLines(string objFile, const char header);
+Vertex* loadVertices(int numVertices, string objFile);
+int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, string objFile);
+Vertex loadMaterial(const string mat_name, string objFile);
 
 //--GLUT Callbacks
 void render();
@@ -216,11 +216,11 @@ void keyboard(unsigned char key, int x_pos, int y_pos)
 bool initialize()
 {
     Vertex* vertexIndices = 0;
-    int numVertices = countLines("cube.obj", 'v');
-    numFaces = countLines("cube.obj", 'f');
-    vertexIndices = loadVertices(numVertices, "cube.obj");
+    int numVertices = countLines(objPath, 'v');
+    numFaces = countLines(objPath, 'f');
+    vertexIndices = loadVertices(numVertices, objPath);
     Vertex* geometry = 0;
-    loadTriangles(vertexIndices, geometry, numVertices, numFaces, "cube.obj");
+    loadTriangles(vertexIndices, geometry, numVertices, numFaces, objPath);
 
     // Create a Vertex Buffer object to store this vertex info on the GPU
     glGenBuffers(1, &vbo_geometry);
@@ -357,7 +357,7 @@ void contextMenu(int id)
     glutPostRedisplay();
 }
 
-int countLines(const char* objFile, const char header)
+int countLines(string objFile, const char header)
 {
     ifstream fin;
     fin.open(objFile);
@@ -380,7 +380,7 @@ int countLines(const char* objFile, const char header)
     return -1;
 }
 
-Vertex* loadVertices(int numVertices, const char* objFile)
+Vertex* loadVertices(int numVertices, string objFile)
 {
     Vertex* vertexIndices = new Vertex[numVertices];
     ifstream fin;
@@ -410,7 +410,7 @@ Vertex* loadVertices(int numVertices, const char* objFile)
     return vertexIndices;
 }
 
-int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, const char* objFile)
+int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numFaces, string objFile)
 {
     geometry = new Vertex[numFaces * 3];
     float currentColor[3] = {1, 1, 1};
@@ -426,7 +426,7 @@ int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numF
             if (input == "usemtl")
             {
                 fin >> input;
-                Vertex temp = loadMaterial(input, "cube.obj");
+                Vertex temp = loadMaterial(input, objPath);
                 currentColor[0] = temp.color[0];
                 currentColor[1] = temp.color[1];
                 currentColor[2] = temp.color[2];
@@ -457,7 +457,7 @@ int loadTriangles(Vertex* vertices, Vertex* &geometry, int numVertices, int numF
     return numAdded;
 }
 
-Vertex loadMaterial(const string mat_name, const char* objFile)
+Vertex loadMaterial(const string mat_name, string objFile)
 {
     Vertex temp = {{0, 0, 0}, {1, 1, 1}};
     string path = "";
