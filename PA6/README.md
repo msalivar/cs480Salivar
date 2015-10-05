@@ -1,4 +1,4 @@
-PA5: Assimp Model & Texture Loader
+PA6: Assimp Model & Texture Loader
 =========================
 
 Features
