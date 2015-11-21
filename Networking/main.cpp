@@ -17,6 +17,7 @@ const int packets_per_node = 0; // If 0, random per node
 
 int runSimulation(int numNodes); // Begins Simulation with given number of nodes (wifi devices)
 void setupNode(int numPackets, Node* node); // Generates packets to send in the node
+void activateNode(Node* node, bool* idle); // Starts packet transfer or decrements backoff counter
 int checkForCompletion(int numNodes, Node* nodes); // Is sim done?
 
 int main()
@@ -37,12 +38,14 @@ int runSimulation(int numNodes)
 
 	int timer = 0;
 	bool finished = false;
+	bool channel_idle = true;
 	while (!finished)
 	{
+		for (int count = 0; count < numNodes; count++)
+		{
+			activateNode(&nodes[count], &channel_idle);
+		}
 		if (checkForCompletion(numNodes, nodes) == numNodes) { finished = true; }
-		
-		
-		
 		timer++;
 	}
 
@@ -73,6 +76,31 @@ void setupNode(int numPackets, Node* node)
 		node->packets[count] = num;
 		//cout << num << endl;
 	}
+}
+
+void activateNode(Node* node, bool* idle)
+{
+	if (node->is_transmitting)
+	{
+		// If finished this time
+		if (node->transmit()) { *idle = true; }
+		return;
+	}
+	// If chanel is idle and packet can be sent
+	if (idle && node->isFinished() == false)
+	{
+		node->beginTransmit(ack_time);
+		node->contentionWindow = 2;
+		*idle = false;
+		return;
+	}
+	// Else choose backoff or count down when idle
+	int backoff = rand() % node->contentionWindow;
+	node->setBackoff();
+	// Counter is 0, transmit and wait for ack
+
+	// Ack recieved? Packet has been recieved -> step 2, else choose higher backoff
+
 }
 
 int checkForCompletion(int numNodes, Node* nodes)
