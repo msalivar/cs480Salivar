@@ -94,13 +94,23 @@ void activateNode(Node* node, bool* idle)
 		*idle = false;
 		return;
 	}
+	if (*idle)
+	{
+		int backoff = rand() % node->contentionWindow;
+		node->setBackoff(backoff);
+	}
+	else
+	{
+		node->current_backoff--;
+		if (node->current_backoff == 0)
+		{
+			// Collision
+			if ()
+		}
+	}
 	// Else choose backoff or count down when idle
-	int backoff = rand() % node->contentionWindow;
-	node->setBackoff();
 	// Counter is 0, transmit and wait for ack
-
 	// Ack recieved? Packet has been recieved -> step 2, else choose higher backoff
-
 }
 
 int checkForCompletion(int numNodes, Node* nodes)
