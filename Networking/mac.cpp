@@ -4,15 +4,17 @@
 Node::Node()
 {
 	waiting_for_ack = false;
+	waiting_to_transmit = false;
 	is_transmitting = false;
 	backoff_set = false;
+	packets = 0;
 	contentionWindow = 2;
 	packets_to_send = 0;
 	packets_sent = 0;
-	packets = 0;
 	current_packet_time = -1;
 	current_backoff = 0;
 	current_ack_wait = 0;
+	current_difs = 0;
 }
 
 Node::~Node()
